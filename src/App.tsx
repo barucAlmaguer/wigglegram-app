@@ -41,7 +41,24 @@ const DEFAULT_CROSSHAIR: Point = {
   y: DEFAULT_CROP.height / 2,
 }
 
+const getInitialTheme = (): 'light' | 'dark' => {
+  if (typeof window === 'undefined') return 'light'
+  const stored = window.localStorage.getItem('theme')
+  if (stored === 'dark' || stored === 'light') {
+    return stored
+  }
+  const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
+  return mediaQuery?.matches ? 'dark' : 'light'
+}
+
 function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const initialTheme = getInitialTheme()
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', initialTheme)
+    }
+    return initialTheme
+  })
   const [images, setImages] = useState<LoadedImage[]>([
     makeInitialImage('a', 'Left Frame'),
     makeInitialImage('b', 'Right Frame'),
@@ -55,6 +72,13 @@ function App() {
   const [gifUrl, setGifUrl] = useState<string | null>(null)
   const [isGeneratingGif, setIsGeneratingGif] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('theme', theme)
+    }
+  }, [theme])
 
   const updateImage = useCallback(
     (id: 'a' | 'b', updater: (image: LoadedImage) => LoadedImage) => {
@@ -222,10 +246,35 @@ function App() {
     setGifUrl(null)
   }, [])
 
+  const toggleTheme = useCallback(() => {
+    setTheme((previous: 'light' | 'dark') =>
+      previous === 'light' ? 'dark' : 'light',
+    )
+  }, [])
+
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>Wigglegram Studio</h1>
+        <div className="header-top">
+          <h1>Wigglegram Studio</h1>
+          <button
+            type="button"
+            className={`theme-toggle ${theme === 'dark' ? 'is-dark' : ''}`}
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            aria-pressed={theme === 'dark'}
+          >
+            <span className="toggle-track">
+              <span className="toggle-icon sun" aria-hidden="true">
+                ☀️
+              </span>
+              <span className="toggle-icon moon" aria-hidden="true">
+                🌙
+              </span>
+              <span className="toggle-thumb" aria-hidden="true" />
+            </span>
+          </button>
+        </div>
         <p>
           Load two offset photos, align them, and preview the animated depth
           effect.
