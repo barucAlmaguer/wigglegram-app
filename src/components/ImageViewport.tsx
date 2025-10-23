@@ -4,12 +4,13 @@ import type { Dimensions, LoadedImage, Point } from '../types.ts'
 
 interface ImageViewportProps {
   image: LoadedImage
+  referenceImage?: LoadedImage | null
   crop: Dimensions
   crosshair: Point
   onCrosshairChange: (point: Point) => void
   showCrosshair: boolean
-  isActive: boolean
-  onActivate: () => void
+  crosshairOpacity?: number
+  referenceOpacity?: number
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -17,12 +18,13 @@ const clamp = (value: number, min: number, max: number) =>
 
 export function ImageViewport({
   image,
+  referenceImage,
   crop,
   crosshair,
   onCrosshairChange,
   showCrosshair,
-  isActive,
-  onActivate,
+  crosshairOpacity = 0.5,
+  referenceOpacity = 0.32,
 }: ImageViewportProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -78,11 +80,10 @@ export function ImageViewport({
     (event: PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return
       event.preventDefault()
-      onActivate()
       setIsDragging(true)
       handlePointerPosition(event.clientX, event.clientY)
     },
-    [handlePointerPosition, onActivate],
+    [handlePointerPosition],
   )
 
   const handlePointerMove = useCallback(
@@ -109,24 +110,39 @@ export function ImageViewport({
     return {
       left: `${left}%`,
       top: `${top}%`,
+      opacity: crosshairOpacity,
     }
-  }, [crosshair.x, crosshair.y, crop.height, crop.width, showCrosshair])
+  }, [crosshair.x, crosshair.y, crop.height, crop.width, crosshairOpacity, showCrosshair])
 
-  const { offsetX, offsetY, rotation, scale } = image.adjustments
-  const naturalWidth = image.naturalWidth ?? crop.width
-  const naturalHeight = image.naturalHeight ?? crop.height
+  const makeTransform = useCallback(
+    (target: LoadedImage) => {
+      const referenceWidth = target.naturalWidth ?? crop.width
+      const referenceHeight = target.naturalHeight ?? crop.height
+      const translateX = target.adjustments.offsetX * displayScaleX
+      const translateY = target.adjustments.offsetY * displayScaleY
+      const baseWidth = referenceWidth * displayScaleX || crop.width
+      const baseHeight = referenceHeight * displayScaleY || crop.height
+      return {
+        width: `${baseWidth}px`,
+        height: `${baseHeight}px`,
+        transform: `translate(calc(-50% + ${translateX}px), calc(-50% + ${translateY}px)) rotate(${target.adjustments.rotation}deg) scale(${target.adjustments.scale})`,
+      }
+    },
+    [crop.height, crop.width, displayScaleX, displayScaleY],
+  )
 
-  const transformStyle = useMemo(() => {
-    const translateX = offsetX * displayScaleX
-    const translateY = offsetY * displayScaleY
-    const baseWidth = naturalWidth * displayScaleX || crop.width
-    const baseHeight = naturalHeight * displayScaleY || crop.height
+  const transformStyle = useMemo(
+    () => makeTransform(image),
+    [image, makeTransform],
+  )
+
+  const referenceTransformStyle = useMemo(() => {
+    if (!referenceImage) return undefined
     return {
-      width: `${baseWidth}px`,
-      height: `${baseHeight}px`,
-      transform: `translate(calc(-50% + ${translateX}px), calc(-50% + ${translateY}px)) rotate(${rotation}deg) scale(${scale})`,
+      ...makeTransform(referenceImage),
+      opacity: referenceOpacity,
     }
-  }, [crop.height, crop.width, displayScaleX, displayScaleY, naturalHeight, naturalWidth, offsetX, offsetY, rotation, scale])
+  }, [makeTransform, referenceImage, referenceOpacity])
 
   const containerStyle = useMemo(
     () => ({
@@ -153,7 +169,6 @@ export function ImageViewport({
         ref={containerRef}
         className={[
           'viewport-canvas',
-          isActive ? 'is-active' : '',
           image.objectUrl ? '' : 'is-empty',
         ].join(' ')}
         style={containerStyle}
@@ -168,13 +183,22 @@ export function ImageViewport({
           <img
             src={image.objectUrl}
             alt={`${image.label} preview`}
-            className="viewport-image"
+            className="viewport-image primary-frame"
             draggable={false}
             style={transformStyle}
           />
         ) : (
           <div className="viewport-placeholder">Drop image here</div>
         )}
+        {referenceImage?.objectUrl ? (
+          <img
+            src={referenceImage.objectUrl}
+            alt={`${referenceImage.label} reference`}
+            className="viewport-image reference-frame"
+            draggable={false}
+            style={referenceTransformStyle}
+          />
+        ) : null}
 
         {showCrosshair && (
           <div className="crosshair" style={crosshairStyle}>

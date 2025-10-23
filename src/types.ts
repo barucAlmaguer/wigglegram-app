@@ -16,7 +16,7 @@ export interface ImageAdjustments {
 }
 
 export interface LoadedImage {
-  id: 'a' | 'b'
+  id: string
   label: string
   objectUrl?: string
   fileName?: string
@@ -30,3 +30,7 @@ export interface LoadedImage {
 export interface FrameRenderOptions {
   crop: Dimensions
 }
+
+export type ExportFormat = 'gif' | 'mp4'
+
+export type ExportQuality = 'low' | 'medium' | 'high'

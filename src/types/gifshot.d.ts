@@ -6,6 +6,8 @@ declare module 'gifshot' {
     interval: number
     numFrames?: number
     sampleInterval?: number
+    gifQuality?: number
+    numWorkers?: number
   }
 
   interface CreateGIFResult {
